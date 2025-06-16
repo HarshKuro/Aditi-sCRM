@@ -6,14 +6,8 @@ import User from '@/models/User';
 import { customerSchema } from '@/lib/excel-utils';
 
 // GET /api/customers - Fetch customers
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest, session: any) => {
   try {
-    const session = await getServerSession();
-    
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     await dbConnect();
 
     const { searchParams } = new URL(request.url);
@@ -21,6 +15,9 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10');
     const status = searchParams.get('status');
     const search = searchParams.get('search');
+    const country = searchParams.get('country') || '';
+    const visaType = searchParams.get('visaType') || '';
+    const assignedTo = searchParams.get('assignedTo') || '';
 
     // Build query
     const query: any = {};
@@ -37,8 +34,20 @@ export async function GET(request: NextRequest) {
       ];
     }
 
+    if (country) {
+      query.country = { $regex: country, $options: 'i' };
+    }
+    
+    if (visaType) {
+      query.visaType = { $regex: visaType, $options: 'i' };
+    }
+    
+    if (assignedTo) {
+      query.assignedTo = assignedTo;
+    }
+
     // If user is not admin, only show their assigned customers
-    if (session.user.role !== 'Admin') {
+    if (session.user.role !== 'Admin' && session.user.role !== 'Manager') {
       query.assignedTo = session.user.id;
     }
 
@@ -46,13 +55,31 @@ export async function GET(request: NextRequest) {
 
     const [customers, total] = await Promise.all([
       Customer.find(query)
-        .populate('assignedTo', 'name email')
+        .populate('assignedTo', 'name email role')
         .populate('createdBy', 'name email')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
       Customer.countDocuments(query),
     ]);
+
+    // Get filter options for admin/manager users
+    let filters = {};
+    if (session.user.role === 'Admin' || session.user.role === 'Manager') {      const [countries, visaTypes, employees] = await Promise.all([
+        Customer.distinct('country', { country: { $exists: true, $ne: '' } }),
+        Customer.distinct('visaType', { visaType: { $exists: true, $ne: '' } }),
+        User.find({ role: { $in: ['Admin', 'Manager', 'Employee'] } })
+          .select('name email role')
+          .sort({ name: 1 })
+      ]);
+      
+      filters = {
+        countries: countries.sort(),
+        visaTypes: visaTypes.sort(),
+        employees,
+        statuses: ['Lead', 'Prospect', 'Customer', 'Inactive']
+      };
+    }
 
     return NextResponse.json({
       customers,
@@ -61,7 +88,10 @@ export async function GET(request: NextRequest) {
         limit,
         total,
         pages: Math.ceil(total / limit),
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1
       },
+      filters
     });
 
   } catch (error) {
@@ -71,17 +101,11 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+}, ['Admin', 'Manager', 'Employee']);
 
 // POST /api/customers - Create customer
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest, session: any) => {
   try {
-    const session = await getServerSession();
-    
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     await dbConnect();
 
     const body = await request.json();
@@ -97,7 +121,7 @@ export async function POST(request: NextRequest) {
 
     await customer.save();
     
-    await customer.populate('assignedTo', 'name email');
+    await customer.populate('assignedTo', 'name email role');
     await customer.populate('createdBy', 'name email');
 
     return NextResponse.json(customer, { status: 201 });
@@ -109,4 +133,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+}, ['Admin', 'Manager', 'Employee']);

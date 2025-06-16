@@ -14,5 +14,6 @@ export const config = {
     '/reports/:path*',
     '/sales-pipeline/:path*',
     '/user-management/:path*',
+    '/admin/:path*',
   ],
 };

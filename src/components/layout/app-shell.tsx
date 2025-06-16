@@ -32,7 +32,8 @@ import {
   ChevronDown,
   Aperture,
   PanelLeftOpen,
-  PanelLeftClose
+  PanelLeftClose,
+  Upload
 } from "lucide-react";
 import type { UserRole } from "@/lib/types";
 import {
@@ -60,6 +61,8 @@ const navItems: NavItem[] = [
   { title: "Sales Pipeline", href: "/sales-pipeline", icon: Presentation },
   { title: "Reports", href: "/reports", icon: FileText, role: ["Admin"] },
   { title: "User Management", href: "/user-management", icon: UserCog, role: ["Admin"] },
+  { title: "Employee Management", href: "/admin/employees", icon: Users, role: ["Admin"] },
+  { title: "Import Customers", href: "/admin/import", icon: Upload, role: ["Admin"] },
   { title: "Admin Panel", href: "/admin", icon: Settings, role: ["Admin"] },
   { title: "Employee Portal", href: "/employee", icon: Users, role: ["Employee", "Admin"] },
   { title: "Shared Resources", href: "/shared", icon: FileText },

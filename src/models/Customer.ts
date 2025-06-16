@@ -6,11 +6,16 @@ export interface ICustomer extends Document {
   email?: string;
   phone?: string;
   company?: string;
+  country?: string;
+  visaType?: string;
   status: 'Lead' | 'Prospect' | 'Customer' | 'Inactive';
   source?: string;
   notes?: string;
   assignedTo?: mongoose.Types.ObjectId;
   createdBy: mongoose.Types.ObjectId;
+  tags: string[];
+  importedAt?: Date;
+  importBatch?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,11 +40,20 @@ const customerSchema = new Schema<ICustomer>(
     phone: {
       type: String,
       trim: true,
-    },
-    company: {
+    },    company: {
       type: String,
       trim: true,
       maxlength: [100, 'Company name cannot be more than 100 characters'],
+    },
+    country: {
+      type: String,
+      trim: true,
+      maxlength: [50, 'Country cannot be more than 50 characters'],
+    },
+    visaType: {
+      type: String,
+      trim: true,
+      maxlength: [50, 'Visa type cannot be more than 50 characters'],
     },
     status: {
       type: String,
@@ -57,11 +71,21 @@ const customerSchema = new Schema<ICustomer>(
     assignedTo: {
       type: Schema.Types.ObjectId,
       ref: 'User',
-    },
-    createdBy: {
+    },    createdBy: {
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+    },
+    tags: {
+      type: [String],
+      default: [],
+    },
+    importedAt: {
+      type: Date,
+    },
+    importBatch: {
+      type: String,
+      maxlength: [100, 'Import batch ID cannot be more than 100 characters'],
     },
   },
   {
@@ -74,6 +98,8 @@ customerSchema.index({ email: 1 });
 customerSchema.index({ status: 1 });
 customerSchema.index({ assignedTo: 1 });
 customerSchema.index({ createdBy: 1 });
+customerSchema.index({ country: 1 });
+customerSchema.index({ importBatch: 1 });
 
 // Prevent re-compilation in development
 const Customer: Model<ICustomer> = mongoose.models.Customer || mongoose.model<ICustomer>('Customer', customerSchema);

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { withAuth } from '@/lib/auth-utils';
 import dbConnect from '@/lib/mongodb';
 import Customer from '@/models/Customer';
+import User from '@/models/User';
 import { customerSchema } from '@/lib/excel-utils';
 
 // GET /api/customers - Fetch customers

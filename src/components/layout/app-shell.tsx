@@ -59,6 +59,7 @@ const navItems: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Customers", href: "/customers", icon: Users },
   { title: "My Customers", href: "/employee/customers", icon: Users, role: ["Employee", "Manager", "Admin"] },
+  { title: "My Performance", href: "/employee/analytics", icon: BarChart3, role: ["Employee", "Manager", "Admin"] },
   { title: "Tasks", href: "/tasks", icon: ListChecks },
   { title: "Sales Pipeline", href: "/sales-pipeline", icon: Presentation },
   { title: "Reports", href: "/reports", icon: FileText, role: ["Admin"] },

@@ -33,7 +33,8 @@ import {
   Aperture,
   PanelLeftOpen,
   PanelLeftClose,
-  Upload
+  Upload,
+  BarChart3
 } from "lucide-react";
 import type { UserRole } from "@/lib/types";
 import {
@@ -63,6 +64,7 @@ const navItems: NavItem[] = [
   { title: "User Management", href: "/user-management", icon: UserCog, role: ["Admin"] },
   { title: "Employee Management", href: "/admin/employees", icon: Users, role: ["Admin"] },
   { title: "Customer Management", href: "/admin/customers", icon: UserCog, role: ["Admin", "Manager"] },
+  { title: "Analytics Dashboard", href: "/admin/analytics", icon: BarChart3, role: ["Admin", "Manager"] },
   { title: "Import Customers", href: "/admin/import", icon: Upload, role: ["Admin"] },
   { title: "Admin Panel", href: "/admin", icon: Settings, role: ["Admin"] },
   { title: "Employee Portal", href: "/employee", icon: Users, role: ["Employee", "Admin"] },

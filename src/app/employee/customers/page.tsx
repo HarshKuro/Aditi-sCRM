@@ -110,9 +110,9 @@ function EmployeeCustomersPage() {
   });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('');
-  const [selectedTemperature, setSelectedTemperature] = useState('');
-  const [selectedTag, setSelectedTag] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedTemperature, setSelectedTemperature] = useState('all');
+  const [selectedTag, setSelectedTag] = useState('all');
   
   // Update dialog
   const [updateDialog, setUpdateDialog] = useState(false);
@@ -139,8 +139,9 @@ function EmployeeCustomersPage() {
       });
       
       if (searchTerm) params.append('search', searchTerm);
-      if (selectedStatus) params.append('status', selectedStatus);
-      if (selectedTemperature) params.append('temperature', selectedTemperature);
+      if (selectedStatus && selectedStatus !== 'all') params.append('status', selectedStatus);
+      if (selectedTemperature && selectedTemperature !== 'all') params.append('temperature', selectedTemperature);
+      if (selectedTag && selectedTag !== 'all') params.append('tag', selectedTag);
 
       const response = await fetch(`/api/customers?${params.toString()}`);
       if (response.ok) {
@@ -171,7 +172,7 @@ function EmployeeCustomersPage() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, searchTerm, selectedStatus, selectedTemperature, session?.user?.id, toast]);
+  }, [pagination.page, pagination.limit, searchTerm, selectedStatus, selectedTemperature, selectedTag, session?.user?.id, toast]);
   // Initial load
   useEffect(() => {
     if (session?.user?.id) {
@@ -254,9 +255,9 @@ function EmployeeCustomersPage() {
   // Reset filters
   const resetFilters = () => {
     setSearchTerm('');
-    setSelectedStatus('');
-    setSelectedTemperature('');
-    setSelectedTag('');
+    setSelectedStatus('all');
+    setSelectedTemperature('all');
+    setSelectedTag('all');
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
@@ -389,12 +390,12 @@ function EmployeeCustomersPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <Label>Status</Label>
-              <Select value={selectedStatus || ''} onValueChange={setSelectedStatus}>
+              <Select value={selectedStatus || 'all'} onValueChange={setSelectedStatus}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Statuses</SelectItem>
+                  <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="Lead">Lead</SelectItem>
                   <SelectItem value="Prospect">Prospect</SelectItem>
                   <SelectItem value="Customer">Customer</SelectItem>
@@ -405,12 +406,12 @@ function EmployeeCustomersPage() {
 
             <div>
               <Label>Temperature</Label>
-              <Select value={selectedTemperature || ''} onValueChange={setSelectedTemperature}>
+              <Select value={selectedTemperature || 'all'} onValueChange={setSelectedTemperature}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Temperatures" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Temperatures</SelectItem>
+                  <SelectItem value="all">All Temperatures</SelectItem>
                   <SelectItem value="hot">🔥 Hot</SelectItem>
                   <SelectItem value="warm">🌡️ Warm</SelectItem>
                   <SelectItem value="cold">❄️ Cold</SelectItem>
@@ -420,11 +421,11 @@ function EmployeeCustomersPage() {
 
             <div>
               <Label>Tag</Label>
-              <Select value={selectedTag || ''} onValueChange={setSelectedTag}>
+              <Select value={selectedTag || 'all'} onValueChange={setSelectedTag}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Tags" />
                 </SelectTrigger>                <SelectContent>
-                  <SelectItem value="">All Tags</SelectItem>
+                  <SelectItem value="all">All Tags</SelectItem>
                   {availableTags.filter(tag => tag && tag.trim().length > 0).map((tag) => (
                     <SelectItem key={tag} value={tag}>
                       {tag}

@@ -1,4 +1,3 @@
-
 export type UserRole = 'Admin' | 'Manager' | 'Employee';
 
 export interface User {
@@ -7,6 +6,8 @@ export interface User {
   role: UserRole;
   name: string;
   avatar?: string;
+  _id: string;
+  email: string;
 }
 
 export type CustomerStatus = 'Lead' | 'Prospect' | 'Customer';
@@ -22,20 +23,23 @@ export interface Customer {
   notes: string;
   createdAt: string;
   updatedAt: string;
+  _id: string;
 }
 
 export type TaskStatus = 'Pending' | 'In Progress' | 'Completed';
-export type TaskPriority = 'High' | 'Medium' | 'Low';
+export type TaskPriority = 'Low' | 'Medium' | 'High';
 
 export interface Task {
-  id: string;
+  _id: string;
   title: string;
   description: string;
-  dueDate: string;
   status: TaskStatus;
   priority: TaskPriority;
-  customerId: string | null;
-  assignedEmployeeId: string;
+  dueDate: string;
+  customerId: Customer | null;
+  assignedEmployeeId: User;
+  createdBy: User;
+  lastUpdatedBy: User;
   createdAt: string;
   updatedAt: string;
 }

@@ -14,16 +14,20 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
     const status = searchParams.get('status');
-    const search = searchParams.get('search');
-    const country = searchParams.get('country') || '';
+    const search = searchParams.get('search');    const country = searchParams.get('country') || '';
     const visaType = searchParams.get('visaType') || '';
     const assignedTo = searchParams.get('assignedTo') || '';
+    const temperature = searchParams.get('temperature') || '';
 
     // Build query
     const query: any = {};
     
     if (status) {
       query.status = status;
+    }
+    
+    if (temperature) {
+      query.temperature = temperature;
     }
     
     if (search) {
@@ -51,12 +55,11 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
       query.assignedTo = session.user.id;
     }
 
-    const skip = (page - 1) * limit;
-
-    const [customers, total] = await Promise.all([
+    const skip = (page - 1) * limit;    const [customers, total] = await Promise.all([
       Customer.find(query)
         .populate('assignedTo', 'name email role')
         .populate('createdBy', 'name email')
+        .populate('lastUpdatedBy', 'name email')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
@@ -72,12 +75,12 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
           .select('name email role')
           .sort({ name: 1 })
       ]);
-      
-      filters = {
+        filters = {
         countries: countries.sort(),
         visaTypes: visaTypes.sort(),
         employees,
-        statuses: ['Lead', 'Prospect', 'Customer', 'Inactive']
+        statuses: ['Lead', 'Prospect', 'Customer', 'Inactive'],
+        temperatures: ['hot', 'warm', 'cold']
       };
     }
 

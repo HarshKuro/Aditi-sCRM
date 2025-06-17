@@ -9,10 +9,12 @@ export interface ICustomer extends Document {
   country?: string;
   visaType?: string;
   status: 'Lead' | 'Prospect' | 'Customer' | 'Inactive';
+  temperature?: 'hot' | 'warm' | 'cold';
   source?: string;
   notes?: string;
   assignedTo?: mongoose.Types.ObjectId;
   createdBy: mongoose.Types.ObjectId;
+  lastUpdatedBy?: mongoose.Types.ObjectId;
   tags: string[];
   importedAt?: Date;
   importBatch?: string;
@@ -54,11 +56,15 @@ const customerSchema = new Schema<ICustomer>(
       type: String,
       trim: true,
       maxlength: [50, 'Visa type cannot be more than 50 characters'],
-    },
-    status: {
+    },    status: {
       type: String,
       enum: ['Lead', 'Prospect', 'Customer', 'Inactive'],
       default: 'Lead',
+    },
+    temperature: {
+      type: String,
+      enum: ['hot', 'warm', 'cold'],
+      default: 'warm',
     },
     source: {
       type: String,
@@ -75,6 +81,10 @@ const customerSchema = new Schema<ICustomer>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+    },
+    lastUpdatedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
     },
     tags: {
       type: [String],

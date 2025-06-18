@@ -36,6 +36,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { AddCustomerDialog } from '@/components/customers/add-customer-dialog';
+import { ViewCustomerDialog } from "@/components/customers/view-customer-dialog";
 
 interface Customer {
   _id: string;
@@ -118,6 +120,14 @@ function AdminCustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [newAssignee, setNewAssignee] = useState('');
   const [reassigning, setReassigning] = useState(false);
+
+  // Editing customer
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  // Viewing customer
+  const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
 
   // Fetch customers
   const fetchCustomers = useCallback(async () => {
@@ -501,8 +511,10 @@ function AdminCustomersPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                setViewingCustomer(customer);
+                                setIsViewDialogOpen(true);
+                              }}>
                                 <Eye className="mr-2 h-4 w-4" />
                                 View Details
                               </DropdownMenuItem>
@@ -516,10 +528,12 @@ function AdminCustomersPage() {
                                 <UserCog className="mr-2 h-4 w-4" />
                                 Reassign
                               </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                setEditingCustomer(customer);
+                                setIsEditDialogOpen(true);
+                              }}>
                                 <Edit className="mr-2 h-4 w-4" />
-                                Edit
+                                Edit Details
                               </DropdownMenuItem>
                               {session?.user?.role === 'Admin' && (
                                 <DropdownMenuItem className="text-destructive">
@@ -620,6 +634,30 @@ function AdminCustomersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ViewCustomerDialog
+        customer={viewingCustomer}
+        open={isViewDialogOpen}
+        onOpenChange={(open) => {
+          setIsViewDialogOpen(open);
+          if (!open) setViewingCustomer(null);
+        }}
+      />
+
+      <AddCustomerDialog
+        mode="edit"
+        customer={editingCustomer}
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+          if (!open) setEditingCustomer(null);
+        }}
+        onCustomerAdded={() => {
+          setEditingCustomer(null);
+          setIsEditDialogOpen(false);
+          fetchCustomers();
+        }}
+      />
     </div>
   );
 }

@@ -95,19 +95,22 @@ export const PATCH = withAuth(async (request: NextRequest, { params }: { params:
 }, ['Admin', 'Manager', 'Employee']);
 
 // DELETE /api/customers/[id] - Delete customer
-export const DELETE = withAuth(async (request: NextRequest, { params }: { params: { id: string } }, session: any) => {
+export const DELETE = withAuth(async (request: NextRequest, session: any) => {
   try {
     await dbConnect();
+    
+    // Get the ID from the URL
+    const id = request.url.split('/').pop();
 
-    // Only admins can delete customers
-    if (session.user.role !== 'Admin') {
+    // Check if user is admin
+    if (!session?.user?.role || session.user.role !== 'Admin') {
       return NextResponse.json(
         { error: 'Only administrators can delete customers' },
         { status: 403 }
       );
     }
 
-    const customer = await Customer.findByIdAndDelete(params.id);
+    const customer = await Customer.findByIdAndDelete(id);
 
     if (!customer) {
       return NextResponse.json(

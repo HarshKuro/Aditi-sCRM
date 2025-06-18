@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,35 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Loader2 } from "lucide-react";
+
+interface Customer {
+  _id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  company?: string;
+  country?: string;
+  visaType?: string;
+  status: 'Lead' | 'Prospect' | 'Customer' | 'Inactive';
+  notes?: string;
+}
 
 interface AddCustomerDialogProps {
   onCustomerAdded: () => void;
+  customer?: Customer | null;
+  mode?: 'add' | 'edit';
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function AddCustomerDialog({ onCustomerAdded }: AddCustomerDialogProps) {
+export function AddCustomerDialog({ 
+  onCustomerAdded, 
+  customer = null, 
+  mode = 'add',
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange
+}: AddCustomerDialogProps) {
   const { data: session } = useSession();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -31,6 +53,45 @@ export function AddCustomerDialog({ onCustomerAdded }: AddCustomerDialogProps) {
   const [status, setStatus] = useState<'Lead' | 'Prospect' | 'Customer' | 'Inactive'>('Lead');
   const [notes, setNotes] = useState("");
 
+  // Handle controlled open state
+  useEffect(() => {
+    if (controlledOpen !== undefined) {
+      setOpen(controlledOpen);
+    }
+  }, [controlledOpen]);
+
+  // Load customer data when editing
+  useEffect(() => {
+    if (mode === 'edit' && customer) {
+      setName(customer.name);
+      setEmail(customer.email || '');
+      setPhone(customer.phone || '');
+      setCompany(customer.company || '');
+      setCountry(customer.country || '');
+      setVisaType(customer.visaType || '');
+      setStatus(customer.status);
+      setNotes(customer.notes || '');
+    }
+  }, [customer, mode]);
+
+  const handleOpenChange = (newOpen: boolean) => {
+    if (controlledOnOpenChange) {
+      controlledOnOpenChange(newOpen);
+    }
+    setOpen(newOpen);
+  };
+
+  const resetForm = () => {
+    setName("");
+    setEmail("");
+    setPhone("");
+    setCompany("");
+    setCountry("");
+    setVisaType("");
+    setStatus('Lead');
+    setNotes("");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -45,8 +106,14 @@ export function AddCustomerDialog({ onCustomerAdded }: AddCustomerDialogProps) {
 
     try {
       setLoading(true);
-      const response = await fetch("/api/customers", {
-        method: "POST",
+      const url = mode === 'edit' && customer 
+        ? `/api/customers/${customer._id}` 
+        : "/api/customers";
+      
+      const method = mode === 'edit' ? "PATCH" : "POST";
+
+      const response = await fetch(url, {
+        method,
         headers: {
           "Content-Type": "application/json",
         },
@@ -64,31 +131,25 @@ export function AddCustomerDialog({ onCustomerAdded }: AddCustomerDialogProps) {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to create customer');
+        throw new Error(error.message || `Failed to ${mode} customer`);
       }
 
-      setOpen(false);
+      handleOpenChange(false);
       onCustomerAdded();
       
-      // Reset form
-      setName("");
-      setEmail("");
-      setPhone("");
-      setCompany("");
-      setCountry("");
-      setVisaType("");
-      setStatus('Lead');
-      setNotes("");
+      if (mode === 'add') {
+        resetForm();
+      }
       
       toast({
         title: "Success",
-        description: "Customer created successfully",
+        description: `Customer ${mode === 'edit' ? 'updated' : 'created'} successfully`,
       });
     } catch (error) {
-      console.error('Error creating customer:', error);
+      console.error(`Error ${mode}ing customer:`, error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create customer. Please try again.",
+        description: error instanceof Error ? error.message : `Failed to ${mode} customer`,
         variant: "destructive",
       });
     } finally {
@@ -97,18 +158,22 @@ export function AddCustomerDialog({ onCustomerAdded }: AddCustomerDialogProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      {mode === 'add' && (
+        <DialogTrigger asChild>
+          <Button>
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[600px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Add New Customer</DialogTitle>
+            <DialogTitle>{mode === 'edit' ? 'Edit Customer' : 'Add New Customer'}</DialogTitle>
             <DialogDescription>
-              Add a new customer to your CRM. Fill in the customer's details below.
+              {mode === 'edit' 
+                ? 'Update customer information below.'
+                : 'Add a new customer to your CRM. Fill in the customer\'s details below.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -198,11 +263,18 @@ export function AddCustomerDialog({ onCustomerAdded }: AddCustomerDialogProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
+            <Button variant="outline" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Creating..." : "Create Customer"}
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {mode === 'edit' ? 'Updating...' : 'Creating...'}
+                </>
+              ) : (
+                mode === 'edit' ? 'Update Customer' : 'Create Customer'
+              )}
             </Button>
           </DialogFooter>
         </form>

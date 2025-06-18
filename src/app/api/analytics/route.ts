@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-utils';
-import Customer from '@/models/Customer';
-import User from '@/models/User';
+import Customer, { ICustomer } from '@/models/Customer';
+import User, { IUser } from '@/models/User';
 import dbConnect from '@/lib/mongodb';
-import Task from '@/models/Task';
+import Task, { ITask } from '@/models/Task';
+import mongoose from 'mongoose';
 
 export const GET = withAuth(async (request: NextRequest, session: any) => {
   try {
@@ -54,49 +55,52 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
     const leads = await Customer.countDocuments({ status: 'Lead' });
     const prospects = await Customer.countDocuments({ status: 'Prospect' });
 
-    // Employee performance analytics
-    const employeeStats = await Promise.all(
-      employees.map(async (employee) => {
-        const totalAssigned = await Customer.countDocuments({
-          assignedTo: employee._id
-        });
-        
-        const statusBreakdown = await Customer.aggregate([
-          { $match: { assignedTo: employee._id } },
-          { $group: { _id: '$status', count: { $sum: 1 } } }
-        ]);
-        
-        const monthlyCustomers = await Customer.countDocuments({
-          assignedTo: employee._id,
-          createdAt: { $gte: new Date(now.getFullYear(), now.getMonth(), 1) }
-        });
+    // Get status distribution
+    const statusDistribution = await Customer.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
+      }
+    ]) as Array<{ _id: string; count: number }>;
 
-        // Simulate temperature for demo (in real app, this would be based on actual data)
-        const temperatureBreakdown = {
-          hot: Math.floor(totalAssigned * 0.2),
-          warm: Math.floor(totalAssigned * 0.5),
-          cold: Math.floor(totalAssigned * 0.3)
-        };
-        
+    // Get employee performance stats
+    const employeeStats = await Customer.aggregate([
+      {
+        $group: {
+          _id: '$assignedTo',
+          totalCustomers: { $sum: 1 },
+          activeCustomers: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['Lead', 'Prospect', 'Customer']] },
+                1,
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]) as Array<{ _id: mongoose.Types.ObjectId; totalCustomers: number; activeCustomers: number }>;
+
+    // Get employee details
+    const employeeDetails = await User.find({
+      _id: { $in: employeeStats.map(stat => stat._id) }
+    }).select('name role') as IUser[];
+
+    // Combine employee stats with details
+    const employeeStatsWithDetails = employeeStats
+      .map(stat => {
+        const employee = employeeDetails.find(emp => emp._id.toString() === stat._id.toString());
         return {
-          employee: {
-            _id: employee._id,
-            name: employee.name,
-            email: employee.email,
-            role: employee.role
-          },
-          totalCustomers: totalAssigned,
-          monthlyCustomers,
-          statusBreakdown: statusBreakdown.reduce((acc, item) => {
-            acc[item._id] = item.count;
-            return acc;
-          }, {}),
-          temperatureBreakdown,
-          conversionRate: totalAssigned > 0 ? 
-            ((statusBreakdown.find(s => s._id === 'Customer')?.count || 0) / totalAssigned * 100).toFixed(1) : '0'
+          name: employee?.name || 'Unknown',
+          role: employee?.role || 'Employee',
+          totalCustomers: stat.totalCustomers,
+          activeCustomers: stat.activeCustomers
         };
       })
-    );
+      .filter(stat => stat.role !== 'Admin');
 
     // Monthly statistics for charts
     const monthlyStats = [];
@@ -132,11 +136,6 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
       });
     }
 
-    // Status distribution for pie chart
-    const statusDistribution = await Customer.aggregate([
-      { $group: { _id: '$status', count: { $sum: 1 } } }
-    ]);
-
     // Country distribution
     const countryDistribution = await Customer.aggregate([
       { $match: { country: { $exists: true, $ne: '' } } },
@@ -154,7 +153,7 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
     ]);
 
     // Performance metrics
-    const topPerformers = employeeStats
+    const topPerformers = employeeStatsWithDetails
       .sort((a, b) => b.totalCustomers - a.totalCustomers)
       .slice(0, 5);
 
@@ -188,13 +187,15 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
     }
 
     // Build user query
-    const userQuery = { role };
-    if (employeeId) userQuery._id = employeeId;
+    const userQuery: { role?: string; _id?: mongoose.Types.ObjectId } = { role };
+    if (employeeId) userQuery._id = new mongoose.Types.ObjectId(employeeId);
     const users = await User.find(userQuery).select('name email role isActive');
 
     // For each user, get stats
-    const employeeStatsFiltered = await Promise.all(users.map(async (user) => {
-      const customerQuery = { assignedTo: user._id };
+    const userStats = await Promise.all(users.map(async (user) => {
+      const customerQuery: { assignedTo: mongoose.Types.ObjectId; status?: string } = { 
+        assignedTo: user._id 
+      };
       if (status) customerQuery.status = status;
       // Total customers
       const totalCustomers = await Customer.countDocuments(customerQuery);
@@ -228,6 +229,39 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
       };
     }));
 
+    // Get recent activity
+    const recentActivity = await Promise.all([
+      // Recent customer updates
+      Customer.find()
+        .sort({ updatedAt: -1 })
+        .limit(5)
+        .select('name status updatedAt')
+        .then(customers => customers.map((customer: ICustomer) => ({
+          type: 'customer',
+          description: `Customer '${customer.name}' status updated to ${customer.status}`,
+          timestamp: new Date(customer.updatedAt).toLocaleString(),
+          icon: 'Users'
+        }))),
+      
+      // Recent task updates
+      Task.find()
+        .sort({ updatedAt: -1 })
+        .limit(5)
+        .select('title status updatedAt')
+        .then(tasks => tasks.map((task: ITask) => ({
+          type: 'task',
+          description: `Task '${task.title}' status updated to ${task.status}`,
+          timestamp: new Date(task.updatedAt).toLocaleString(),
+          icon: 'ListChecks'
+        })))
+    ]).then(results => {
+      // Combine and sort by timestamp
+      const allActivities = results.flat();
+      return allActivities
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 5); // Get only the 5 most recent activities
+    });
+
     return NextResponse.json({
       overview: {
         totalCustomers,
@@ -237,35 +271,29 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
         conversionRate: totalCustomers > 0 ? 
           ((statusDistribution.find(s => s._id === 'Customer')?.count || 0) / totalCustomers * 100).toFixed(1) : '0'
       },
-      employeeStats,
-      topPerformers,
-      monthlyStats,
-      distributions: {
-        status: statusDistribution.map(item => ({
-          name: item._id,
-          value: item.count
-        })),
-        country: countryDistribution.map(item => ({
-          name: item._id,
-          value: item.count
-        })),
-        visaType: visaTypeDistribution.map(item => ({
-          name: item._id,
-          value: item.count
-        }))
+      tasks: {
+        total: totalTasks,
+        completed: completedTasks,
+        pending: pendingTasks,
+        inProgress: inProgressTasks
       },
+      recentActivity,
       timeRange,
       lastUpdated: now.toISOString(),
       users: { total: totalUsers, active: activeUsers },
       customers: { total: totalCustomers, active: activeCustomers, leads, prospects },
-      tasks: { total: totalTasks, completed: completedTasks, pending: pendingTasks, inProgress: inProgressTasks },
-      employeeStatsFiltered
+      employeeStats: employeeStatsWithDetails,
+      userStats,
+      topPerformers,
+      monthlyStats,
+      statusDistribution,
+      countryDistribution
     });
 
   } catch (error) {
     console.error('Analytics API error:', error);
     return NextResponse.json(
-      { error: error.message || 'Unknown error', stack: error.stack || '' },
+      { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

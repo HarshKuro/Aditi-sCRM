@@ -113,7 +113,7 @@ export function withAuth(
   handler: (request: NextRequest, session: any) => Promise<Response>,
   allowedRoles?: UserRole[]
 ) {
-  return async (request: NextRequest) => {
+  return async (request: NextRequest, context?: any) => {
     try {
       let session;
       

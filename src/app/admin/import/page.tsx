@@ -24,7 +24,8 @@ import {
   X, 
   AlertTriangle,
   Tag,
-  UserPlus
+  UserPlus,
+  Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
@@ -51,6 +52,16 @@ interface Employee {
   email: string;
   role: string;
 }
+
+const FIELD_MAPPING_OPTIONS = [
+  { value: 'name', label: 'Name' },
+  { value: 'email', label: 'Email' },
+  { value: 'phone', label: 'Phone' },
+  { value: 'company', label: 'Company' },
+  { value: 'country', label: 'Country' },
+  { value: 'visaType', label: 'Visa Type' },
+  { value: 'do-not-import', label: 'Do Not Import' }
+] as const;
 
 function ImportPage() {
   const { data: session } = useSession();
@@ -218,6 +229,20 @@ function ImportPage() {
       return;
     }
 
+    // Validate that at least one column is mapped to 'name'
+    const hasNameMapping = columnMappings.some(
+      mapping => mapping.selected && mapping.fieldName === 'name'
+    );
+
+    if (!hasNameMapping) {
+      toast({
+        title: 'Missing required field',
+        description: 'You must map at least one column to the "Name" field',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsImporting(true);
 
     try {
@@ -226,7 +251,7 @@ function ImportPage() {
         const customer: any = {};
         
         columnMappings.forEach(mapping => {
-          if (mapping.selected && mapping.fieldName !== 'other' && row[mapping.excelColumn]) {
+          if (mapping.selected && mapping.fieldName !== 'do-not-import' && row[mapping.excelColumn]) {
             customer[mapping.fieldName] = row[mapping.excelColumn];
           }
         });
@@ -240,27 +265,38 @@ function ImportPage() {
         return customer;
       });
 
+      // Filter out empty customers (no data mapped)
+      const validCustomers = customersToImport.filter(
+        customer => Object.keys(customer).length > 0 && customer.name
+      );
+
+      if (validCustomers.length === 0) {
+        throw new Error('No valid customers to import after mapping');
+      }
+
       const response = await fetch('/api/customers/import', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          customers: customersToImport,
+          customers: validCustomers,
         }),
       });
 
       const result = await response.json();
 
-      if (response.ok) {
-        setImportResults(result);
-        toast({
-          title: 'Import successful',
-          description: `Successfully imported ${result.imported} customers`,
-        });
-      } else {
+      if (!response.ok) {
         throw new Error(result.error || 'Import failed');
       }
+
+      setImportResults(result);
+      toast({
+        title: 'Import successful',
+        description: `Successfully imported ${result.imported} customers${
+          result.skipped ? ` (${result.skipped} skipped)` : ''
+        }`,
+      });
 
     } catch (error: any) {
       console.error('Import error:', error);
@@ -393,40 +429,47 @@ function ImportPage() {
               <CardDescription>
                 Map Excel columns to customer fields and select which columns to import
               </CardDescription>
-            </CardHeader>            <CardContent>
-              <div className="space-y-4">
-                {columnMappings && columnMappings.length > 0 && columnMappings.map((mapping, index) => (
-                  <div key={index} className="flex items-center space-x-4 p-3 border rounded-lg">
-                    <Checkbox
-                      checked={mapping.selected}
-                      onCheckedChange={() => toggleColumnSelection(index)}
-                    />
-                    <div className="flex-1">
-                      <p className="font-medium">{mapping.excelColumn}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Sample: {parsedData[0]?.[mapping.excelColumn] || 'N/A'}
-                      </p>
-                    </div>
-                    <Select
-                      value={mapping.fieldName || 'do-not-import'}
-                      onValueChange={(value) => updateColumnMapping(index, value)}
-                    >
-                      <SelectTrigger className="w-48">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="name">Name</SelectItem>
-                        <SelectItem value="email">Email</SelectItem>
-                        <SelectItem value="phone">Phone</SelectItem>
-                        <SelectItem value="company">Company</SelectItem>
-                        <SelectItem value="country">Country</SelectItem>
-                        <SelectItem value="visaType">Visa Type</SelectItem>
-                        <SelectItem value="do-not-import">Don't Import</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
-              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Import</TableHead>
+                    <TableHead>Excel Column</TableHead>
+                    <TableHead>Map To Field</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {columnMappings.map((mapping, index) => (
+                    <TableRow key={mapping.excelColumn}>
+                      <TableCell>
+                        <Checkbox
+                          checked={mapping.selected}
+                          onCheckedChange={() => toggleColumnSelection(index)}
+                        />
+                      </TableCell>
+                      <TableCell>{mapping.excelColumn}</TableCell>
+                      <TableCell>
+                        <Select
+                          value={mapping.fieldName || 'do-not-import'}
+                          onValueChange={(value) => updateColumnMapping(index, value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {FIELD_MAPPING_OPTIONS.map(option => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
 
@@ -473,15 +516,18 @@ function ImportPage() {
                 />
               </div>              <div>
                 <Label htmlFor="assign-employee">Assign All To Employee</Label>
-                <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select employee (optional)" />
+                <Select 
+                  value={selectedEmployee || 'unassigned'}
+                  onValueChange={setSelectedEmployee}
+                >
+                  <SelectTrigger className="w-[300px]">
+                    <SelectValue placeholder="Select an employee" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No Assignment</SelectItem>
-                    {employees && employees.length > 0 && employees.map((employee) => (
+                    <SelectItem value="unassigned">Do not assign</SelectItem>
+                    {employees.map((employee) => (
                       <SelectItem key={employee._id} value={employee._id}>
-                        {employee.name} ({employee.role})
+                        {employee.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -553,23 +599,25 @@ function ImportPage() {
                     {columnMappings.filter(m => m.selected).length} columns selected, {parsedData.length} rows
                   </p>
                 </div>
-                <Button 
-                  onClick={handleImport} 
-                  disabled={isImporting}
-                  size="lg"
-                >
-                  {isImporting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                      Importing...
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Import {parsedData.length} Customers
-                    </>
-                  )}
-                </Button>
+                <div className="flex justify-end mt-6">
+                  <Button 
+                    onClick={handleImport} 
+                    disabled={isImporting || !parsedData.length}
+                    className="w-[200px]"
+                  >
+                    {isImporting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Importing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Import {parsedData.length} Customers
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

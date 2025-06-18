@@ -11,8 +11,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { AddCustomerDialog } from "@/components/customers/add-customer-dialog";
-import { Search, Filter, MoreHorizontal, Edit, Trash2, Eye, Building, Phone, Mail, Globe } from "lucide-react";
+import { Search, Filter, MoreHorizontal, Edit, Trash2, Eye, Building, Phone, Mail, Globe, Users } from "lucide-react";
 import { format } from 'date-fns';
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 interface Customer {
   _id: string;
@@ -52,6 +53,12 @@ export default function CustomersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [countryFilter, setCountryFilter] = useState<string>("all");
   const [visaTypeFilter, setVisaTypeFilter] = useState<string>("all");
+  const [stats, setStats] = useState({
+    Lead: 0,
+    Prospect: 0,
+    Customer: 0,
+    Inactive: 0
+  });
   const [filters, setFilters] = useState<{
     countries: string[];
     visaTypes: string[];
@@ -66,6 +73,8 @@ export default function CustomersPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
+      
+      // Only add filters if they are not set to 'all'
       if (searchTerm) params.append('search', searchTerm);
       if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
       if (countryFilter && countryFilter !== 'all') params.append('country', countryFilter);
@@ -77,6 +86,7 @@ export default function CustomersPage() {
       }
       const data = await response.json();
       setCustomers(data.customers || []);
+      setStats(data.stats || { Lead: 0, Prospect: 0, Customer: 0, Inactive: 0 });
       if (data.filters) {
         setFilters(data.filters);
       }
@@ -130,6 +140,49 @@ export default function CustomersPage() {
       <PageHeader title="Customer Management" description="View, search, and manage your customers.">
         <AddCustomerDialog onCustomerAdded={fetchCustomers} />
       </PageHeader>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{Object.values(stats).reduce((a, b) => a + b, 0)}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Leads</CardTitle>
+            <span className="text-lg">🎯</span>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.Lead}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
+            <span className="text-lg">👥</span>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.Customer}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Prospects</CardTitle>
+            <span className="text-lg">🎯</span>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.Prospect}</div>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="flex flex-col gap-4">
         <div className="flex flex-col md:flex-row gap-4">

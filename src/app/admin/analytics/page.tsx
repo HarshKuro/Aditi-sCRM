@@ -123,6 +123,8 @@ function AdminAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('6months');
   const [activeChart, setActiveChart] = useState<'line' | 'bar' | 'area'>('line');
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [filteredUsers, setFilteredUsers] = useState<UserType[]>([]);
 
   // Fetch analytics data
   const fetchAnalytics = useCallback(async () => {
@@ -196,6 +198,17 @@ function AdminAnalyticsPage() {
     return ((current - previous) / previous * 100);
   };
 
+  const handleExport = () => {
+    if (!analytics) return;
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(analytics, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "analytics-data.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto p-6 space-y-6">
@@ -257,7 +270,7 @@ function AdminAnalyticsPage() {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -521,32 +534,46 @@ function AdminAnalyticsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {analytics.employeeStats.map((stat) => (
-                    <TableRow key={stat.employee._id}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{stat.employee.name}</p>
-                          <p className="text-sm text-muted-foreground">{stat.employee.role}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="font-medium">{stat.totalCustomers}</div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="font-medium">{stat.monthlyCustomers}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col space-y-1">
-                          {getTemperatureBadge('hot', stat.temperatureBreakdown.hot)}
-                          {getTemperatureBadge('warm', stat.temperatureBreakdown.warm)}
-                          {getTemperatureBadge('cold', stat.temperatureBreakdown.cold)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="font-medium">{stat.conversionRate}%</div>
+                  {loadingUsers ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="h-24 text-center">
+                        Loading users...
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : analytics.employeeStats.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="h-24 text-center">
+                        No users found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    analytics.employeeStats.map((stat) => (
+                      <TableRow key={stat.employee._id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{stat.employee.name}</p>
+                            <p className="text-sm text-muted-foreground">{stat.employee.role}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="font-medium">{stat.totalCustomers}</div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="font-medium">{stat.monthlyCustomers}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col space-y-1">
+                            {getTemperatureBadge('hot', stat.temperatureBreakdown.hot)}
+                            {getTemperatureBadge('warm', stat.temperatureBreakdown.warm)}
+                            {getTemperatureBadge('cold', stat.temperatureBreakdown.cold)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="font-medium">{stat.conversionRate}%</div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>

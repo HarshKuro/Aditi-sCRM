@@ -28,7 +28,7 @@ export function AddCustomerDialog({ onCustomerAdded }: AddCustomerDialogProps) {
   const [company, setCompany] = useState("");
   const [country, setCountry] = useState("");
   const [visaType, setVisaType] = useState("");
-  const [status, setStatus] = useState("Lead");
+  const [status, setStatus] = useState<'Lead' | 'Prospect' | 'Customer' | 'Inactive'>('Lead');
   const [notes, setNotes] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -57,13 +57,14 @@ export function AddCustomerDialog({ onCustomerAdded }: AddCustomerDialogProps) {
           company,
           country,
           visaType,
-          status,
+          status: status || 'Lead',
           notes,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create customer');
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create customer');
       }
 
       setOpen(false);
@@ -76,7 +77,7 @@ export function AddCustomerDialog({ onCustomerAdded }: AddCustomerDialogProps) {
       setCompany("");
       setCountry("");
       setVisaType("");
-      setStatus("Lead");
+      setStatus('Lead');
       setNotes("");
       
       toast({
@@ -87,7 +88,7 @@ export function AddCustomerDialog({ onCustomerAdded }: AddCustomerDialogProps) {
       console.error('Error creating customer:', error);
       toast({
         title: "Error",
-        description: "Failed to create customer. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to create customer. Please try again.",
         variant: "destructive",
       });
     } finally {

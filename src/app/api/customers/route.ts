@@ -18,6 +18,8 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
     const country = searchParams.get('country');
     const visaType = searchParams.get('visaType');
     const assignedTo = searchParams.get('assignedTo');
+    const temperature = searchParams.get('temperature');
+    const tag = searchParams.get('tag');
 
     // Build query
     const query: any = {};
@@ -50,6 +52,14 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
       }
     }
 
+    if (temperature) {
+      query.temperature = temperature;
+    }
+
+    if (tag) {
+      query.tags = tag;
+    }
+
     // If user is not admin, only show their assigned customers
     if (session.user.role !== 'Admin' && session.user.role !== 'Manager') {
       query.assignedTo = session.user.id;
@@ -75,6 +85,44 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
       Customer.distinct('visaType', { visaType: { $exists: true, $ne: '' } }),
     ]);
 
+    // Get stats for each status
+    const baseQuery = session.user.role !== 'Admin' && session.user.role !== 'Manager' 
+      ? { assignedTo: session.user.id } 
+      : {};
+
+    const stats = await Customer.aggregate([
+      { 
+        $match: baseQuery
+      },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
+      }
+    ]).exec();
+
+    // Initialize counts with 0
+    const statusCounts = {
+      Lead: 0,
+      Prospect: 0,
+      Customer: 0,
+      Inactive: 0
+    };
+
+    // Update counts from aggregation results
+    stats.forEach(({ _id, count }) => {
+      if (_id && _id in statusCounts) {
+        statusCounts[_id] = count;
+      }
+    });
+
+    // Double check the total count
+    const totalCount = await Customer.countDocuments(baseQuery);
+    
+    console.log('Status counts:', statusCounts);
+    console.log('Total count:', totalCount);
+
     return NextResponse.json({
       customers,
       pagination: {
@@ -89,7 +137,8 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
         countries: countries.sort(),
         visaTypes: visaTypes.sort(),
         statuses: ['Lead', 'Prospect', 'Customer', 'Inactive']
-      }
+      },
+      stats: statusCounts
     });
 
   } catch (error) {

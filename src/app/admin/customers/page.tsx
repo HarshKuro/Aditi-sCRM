@@ -160,7 +160,7 @@ function AdminCustomersPage() {
   // Initial load
   useEffect(() => {
     fetchCustomers();
-  }, []);
+  }, [fetchCustomers]);
 
   // Search with debounce
   useEffect(() => {
@@ -313,7 +313,11 @@ function AdminCustomersPage() {
           <div className="grid grid-cols-4 gap-4">
             <div>
               <Label>Country</Label>
-              <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+              <Select 
+                value={selectedCountry} 
+                onValueChange={setSelectedCountry}
+                disabled={loading}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="All Countries" />
                 </SelectTrigger>
@@ -330,7 +334,11 @@ function AdminCustomersPage() {
 
             <div>
               <Label>Visa Type</Label>
-              <Select value={selectedVisaType} onValueChange={setSelectedVisaType}>
+              <Select 
+                value={selectedVisaType} 
+                onValueChange={setSelectedVisaType}
+                disabled={loading}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="All Visa Types" />
                 </SelectTrigger>
@@ -347,7 +355,11 @@ function AdminCustomersPage() {
 
             <div>
               <Label>Assigned To</Label>
-              <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+              <Select 
+                value={selectedEmployee} 
+                onValueChange={setSelectedEmployee}
+                disabled={loading}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="All Employees" />
                 </SelectTrigger>
@@ -365,7 +377,11 @@ function AdminCustomersPage() {
 
             <div>
               <Label>Status</Label>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <Select 
+                value={selectedStatus} 
+                onValueChange={setSelectedStatus}
+                disabled={loading}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
@@ -568,7 +584,11 @@ function AdminCustomersPage() {
           <div className="space-y-4">
             <div>
               <Label>Assign To</Label>
-              <Select value={newAssignee} onValueChange={setNewAssignee}>
+              <Select 
+                value={newAssignee} 
+                onValueChange={setNewAssignee}
+                disabled={reassigning}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>

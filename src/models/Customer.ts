@@ -60,6 +60,7 @@ const customerSchema = new Schema<ICustomer>(
       type: String,
       enum: ['Lead', 'Prospect', 'Customer', 'Inactive'],
       default: 'Lead',
+      required: true,
     },
     temperature: {
       type: String,

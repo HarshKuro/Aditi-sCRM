@@ -1,8 +1,23 @@
+"use client";
+
 import { PageHeader } from '@/components/shared/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useEffect, useState } from 'react';
 
 export default function AdminDashboard() {
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/analytics')
+      .then(res => res.json())
+      .then(data => {
+        setStats(data);
+        setLoading(false);
+      });
+  }, []);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -17,9 +32,9 @@ export default function AdminDashboard() {
             <Badge variant="secondary">+12%</Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">2,350</div>
+            <div className="text-2xl font-bold">{loading ? '...' : stats?.users?.total ?? '-'}</div>
             <p className="text-xs text-muted-foreground">
-              +180 from last month
+              Active: {loading ? '...' : stats?.users?.active ?? '-'}
             </p>
           </CardContent>
         </Card>
@@ -30,35 +45,35 @@ export default function AdminDashboard() {
             <Badge variant="secondary">+5%</Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,234</div>
+            <div className="text-2xl font-bold">{loading ? '...' : stats?.customers?.leads ?? '-'}</div>
             <p className="text-xs text-muted-foreground">
-              +201 from last month
+              Prospects: {loading ? '...' : stats?.customers?.prospects ?? '-'}
             </p>
           </CardContent>
         </Card>
         
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Conversion Rate</CardTitle>
+            <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
             <Badge variant="secondary">+2%</Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">23.4%</div>
+            <div className="text-2xl font-bold">{loading ? '...' : stats?.customers?.active ?? '-'}</div>
             <p className="text-xs text-muted-foreground">
-              +0.5% from last month
+              Total: {loading ? '...' : stats?.customers?.total ?? '-'}
             </p>
           </CardContent>
         </Card>
         
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium">Tasks</CardTitle>
             <Badge variant="secondary">+15%</Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$45,231</div>
+            <div className="text-2xl font-bold">{loading ? '...' : stats?.tasks?.total ?? '-'}</div>
             <p className="text-xs text-muted-foreground">
-              +$5,231 from last month
+              Completed: {loading ? '...' : stats?.tasks?.completed ?? '-'} | Pending: {loading ? '...' : stats?.tasks?.pending ?? '-'}
             </p>
           </CardContent>
         </Card>

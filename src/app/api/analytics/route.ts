@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/auth-utils';
 import Customer from '@/models/Customer';
 import User from '@/models/User';
 import dbConnect from '@/lib/mongodb';
+import Task from '@/models/Task';
 
 export const GET = withAuth(async (request: NextRequest, session: any) => {
   try {
@@ -10,6 +11,10 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
     
     const url = new URL(request.url);
     const timeRange = url.searchParams.get('timeRange') || '6months'; // 1month, 3months, 6months, 1year
+    const role = url.searchParams.get('role') || 'Employee';
+    const status = url.searchParams.get('status');
+    const employeeId = url.searchParams.get('employeeId');
+    const dateRange = url.searchParams.get('dateRange') || 'thisMonth';
     
     // Calculate date range
     const now = new Date();
@@ -46,6 +51,8 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
     const activeCustomers = await Customer.countDocuments({
       status: { $in: ['Prospect', 'Customer'] }
     });
+    const leads = await Customer.countDocuments({ status: 'Lead' });
+    const prospects = await Customer.countDocuments({ status: 'Prospect' });
 
     // Employee performance analytics
     const employeeStats = await Promise.all(
@@ -160,6 +167,67 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
     const growthRate = lastMonthCustomers > 0 ? 
       ((newCustomersThisMonth - lastMonthCustomers) / lastMonthCustomers * 100).toFixed(1) : '0';
 
+    // User stats
+    const totalUsers = await User.countDocuments();
+    const activeUsers = await User.countDocuments({ isActive: true });
+
+    // Task stats
+    const totalTasks = await Task.countDocuments();
+    const completedTasks = await Task.countDocuments({ status: 'Completed' });
+    const pendingTasks = await Task.countDocuments({ status: 'Pending' });
+    const inProgressTasks = await Task.countDocuments({ status: 'In Progress' });
+
+    // Date range logic
+    let startDateRange = new Date(now.getFullYear(), now.getMonth(), 1);
+    let endDateRange = now;
+    if (dateRange === 'lastMonth') {
+      startDateRange = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      endDateRange = new Date(now.getFullYear(), now.getMonth(), 0);
+    } else if (dateRange === 'all') {
+      startDateRange = new Date(2000, 0, 1);
+    }
+
+    // Build user query
+    const userQuery = { role };
+    if (employeeId) userQuery._id = employeeId;
+    const users = await User.find(userQuery).select('name email role isActive');
+
+    // For each user, get stats
+    const employeeStatsFiltered = await Promise.all(users.map(async (user) => {
+      const customerQuery = { assignedTo: user._id };
+      if (status) customerQuery.status = status;
+      // Total customers
+      const totalCustomers = await Customer.countDocuments(customerQuery);
+      // Status breakdown
+      const leads = await Customer.countDocuments({ ...customerQuery, status: 'Lead' });
+      const prospects = await Customer.countDocuments({ ...customerQuery, status: 'Prospect' });
+      const customers = await Customer.countDocuments({ ...customerQuery, status: 'Customer' });
+      const inactive = await Customer.countDocuments({ ...customerQuery, status: 'Inactive' });
+      // Conversion rate
+      const conversionRate = totalCustomers > 0 ? ((customers / totalCustomers) * 100).toFixed(1) : '0';
+      // New customers this month
+      const newCustomersThisMonth = await Customer.countDocuments({ ...customerQuery, createdAt: { $gte: startDateRange, $lte: endDateRange } });
+      // Growth rate (compare to last month)
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      const newCustomersLastMonth = await Customer.countDocuments({ ...customerQuery, createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } });
+      const growthRate = newCustomersLastMonth > 0 ? (((newCustomersThisMonth - newCustomersLastMonth) / newCustomersLastMonth) * 100).toFixed(1) : '0';
+      // Recent activity
+      const recentActivity = await Customer.find({ ...customerQuery }).sort({ updatedAt: -1 }).limit(1).select('name updatedAt');
+      return {
+        user,
+        totalCustomers,
+        leads,
+        prospects,
+        customers,
+        inactive,
+        conversionRate,
+        newCustomersThisMonth,
+        growthRate,
+        recentActivity: recentActivity[0] || null
+      };
+    }));
+
     return NextResponse.json({
       overview: {
         totalCustomers,
@@ -187,13 +255,17 @@ export const GET = withAuth(async (request: NextRequest, session: any) => {
         }))
       },
       timeRange,
-      lastUpdated: now.toISOString()
+      lastUpdated: now.toISOString(),
+      users: { total: totalUsers, active: activeUsers },
+      customers: { total: totalCustomers, active: activeCustomers, leads, prospects },
+      tasks: { total: totalTasks, completed: completedTasks, pending: pendingTasks, inProgress: inProgressTasks },
+      employeeStatsFiltered
     });
 
   } catch (error) {
-    console.error('Error fetching analytics:', error);
+    console.error('Analytics API error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error.message || 'Unknown error', stack: error.stack || '' },
       { status: 500 }
     );
   }

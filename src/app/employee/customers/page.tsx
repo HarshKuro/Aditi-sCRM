@@ -113,6 +113,12 @@ function EmployeeCustomersPage() {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedTemperature, setSelectedTemperature] = useState('all');
   const [selectedTag, setSelectedTag] = useState('all');
+  const [stats, setStats] = useState({
+    Lead: 0,
+    Prospect: 0,
+    Customer: 0,
+    Inactive: 0
+  });
   
   // Update dialog
   const [updateDialog, setUpdateDialog] = useState(false);
@@ -138,41 +144,34 @@ function EmployeeCustomersPage() {
         assignedTo: session?.user?.id || '', // Only get assigned customers
       });
       
+      // Only add filters if they are not set to 'all'
       if (searchTerm) params.append('search', searchTerm);
       if (selectedStatus && selectedStatus !== 'all') params.append('status', selectedStatus);
       if (selectedTemperature && selectedTemperature !== 'all') params.append('temperature', selectedTemperature);
       if (selectedTag && selectedTag !== 'all') params.append('tag', selectedTag);
 
       const response = await fetch(`/api/customers?${params.toString()}`);
-      if (response.ok) {
-        const data = await response.json();
-        setCustomers(data.customers || []);
-        setPagination(data.pagination || pagination);        // Extract unique tags
-        const allTags = data.customers.flatMap((c: Customer) => c.tags || []);
-        const validTags: string[] = [];
-        
-        allTags.forEach((tag: any) => {
-          if (typeof tag === 'string' && tag.trim().length > 0) {
-            validTags.push(tag.trim());
-          }
-        });
-        
-        const uniqueTags = [...new Set(validTags)].sort();
-        setAvailableTags(uniqueTags);
-      } else {
+      if (!response.ok) {
         throw new Error('Failed to fetch customers');
+      }
+      const data = await response.json();
+      setCustomers(data.customers || []);
+      setPagination(data.pagination || pagination);
+      setStats(data.stats || { Lead: 0, Prospect: 0, Customer: 0, Inactive: 0 });
+      if (data.filters) {
+        setAvailableTags(Array.from(new Set(data.customers.flatMap((c: any) => c.tags || []))));
       }
     } catch (error) {
       console.error('Error fetching customers:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to fetch customers',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to load customers. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, searchTerm, selectedStatus, selectedTemperature, selectedTag, session?.user?.id, toast]);
+  }, [pagination.page, pagination.limit, searchTerm, selectedStatus, selectedTemperature, selectedTag, session?.user?.id]);
   // Initial load
   useEffect(() => {
     if (session?.user?.id) {
@@ -316,19 +315,17 @@ function EmployeeCustomersPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{pagination.total}</div>
+            <div className="text-2xl font-bold">{Object.values(stats).reduce((a, b) => a + b, 0)}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Hot Leads</CardTitle>
-            <span className="text-lg">🔥</span>
+            <CardTitle className="text-sm font-medium">Leads</CardTitle>
+            <span className="text-lg">🎯</span>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {customers.filter(c => c.temperature === 'hot').length}
-            </div>
+            <div className="text-2xl font-bold">{stats.Lead}</div>
           </CardContent>
         </Card>
 
@@ -338,9 +335,7 @@ function EmployeeCustomersPage() {
             <span className="text-lg">👥</span>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {customers.filter(c => c.status === 'Customer').length}
-            </div>
+            <div className="text-2xl font-bold">{stats.Customer}</div>
           </CardContent>
         </Card>
 
@@ -350,9 +345,7 @@ function EmployeeCustomersPage() {
             <span className="text-lg">🎯</span>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {customers.filter(c => c.status === 'Prospect').length}
-            </div>
+            <div className="text-2xl font-bold">{stats.Prospect}</div>
           </CardContent>
         </Card>
       </div>
